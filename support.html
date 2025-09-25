@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SupportLive – WhatsApp Style Admin</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+  <style>
+    :root{
+      --wa-green:#075E54;      /* header */
+      --wa-green-dark:#054b44; /* header hover */
+      --wa-teal:#128C7E;       /* accents */
+      --wa-accent:#25D366;     /* floating actions */
+      --bubble-me:#DCF8C6;     /* my message bubble */
+      --bubble-them:#FFFFFF;   /* other bubble */
+      --chat-bg:#0b141a;       /* deep bg under pattern */
+    }
+
+    /* WhatsApp-style chat background */
+    .wa-chat-bg{
+      background-color: var(--chat-bg);
+      background-image:
+        url(""); /* will be set dynamically to NGROK uploads in script */
+      background-size: cover;
+      background-position: center;
+    }
+
+    /* Scrollbars (subtle) */
+    .thin-scroll::-webkit-scrollbar{ width:8px; height:8px; }
+    .thin-scroll::-webkit-scrollbar-thumb{ background:#2a2f32; border-radius:4px; }
+
+    /* Bubble base */
+    .bubble{
+      max-width: 70%;
+      border-radius: 10px;
+      padding: .5rem .7rem .35rem .7rem;
+      position: relative;
+      word-break: break-word;
+      color:#111;
+    }
+    .bubble.me{ background: var(--bubble-me); }
+    .bubble.them{ background: var(--bubble-them); }
+    .bubble .meta{
+      font-size: .68rem;
+      line-height: 1;
+      color: #667781;
+      margin-top: .25rem;
+      display: flex;
+      align-items: center;
+      gap: .3rem;
+      justify-content: flex-end;
+    }
+    .tick{
+      font-size: .75rem;
+      margin-left:.1rem;
+      color:#8696a0;
+    }
+
+    /* List item hover like WhatsApp */
+    .chat-item{ transition: background .15s ease; }
+    .chat-item:hover{ background:#202c33; }
+
+    /* Avatar placeholder */
+    .avatar{
+      width:42px;height:42px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      color:#fff;font-weight:600; letter-spacing:.5px;
+      user-select:none;
+    }
+    .avatar.seed-0{ background:#8e44ad }
+    .avatar.seed-1{ background:#e67e22 }
+    .avatar.seed-2{ background:#2980b9 }
+    .avatar.seed-3{ background:#16a085 }
+    .avatar.seed-4{ background:#c0392b }
+    .avatar.seed-5{ background:#2c3e50 }
+    .avatar.seed-6{ background:#27ae60 }
+    .avatar.seed-7{ background:#d35400 }
+    .avatar.seed-8{ background:#7f8c8d }
+    .avatar.seed-9{ background:#34495e }
+
+    /* Input bar look */
+    .input-pill{
+      background:#2a2f32;
+      color:#e9edef;
+      border-radius: 24px;
+      padding: .6rem .9rem;
+      outline: none;
+      width: 100%;
+    }
+
+    /* Buttons */
+    .icon-btn{
+      width:40px; height:40px; border-radius:9999px;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .icon-btn:hover{ background:#1f2c33; }
+
+    /* Top bars */
+    .topbar{ background: var(--wa-green); color: #e9edef; }
+    .subbar{ background: #202c33; color: #e9edef; }
+
+    /* Right column border */
+    .pane-border{ border-left:1px solid #202c33 }
+
+    /* WhatsApp-style inputs for the Agent Edit Panel */
+    .wa-field{
+      background:#2a2f32; border:1px solid transparent;
+      color:#e9edef; border-radius:10px; padding:.6rem .75rem;
+      outline:none;
+    }
+    .wa-field:focus{ border-color:#3b4a54 }
+    .wa-card{
+      background:#111b21; border:1px solid #202c33; border-radius:14px;
+    }
+    .wa-label{ color:#8696a0; font-size:.8rem }
+    .wa-switch input:checked + span{ background:var(--wa-accent); }
+    .wa-switch span{
+      width:44px;height:24px;border-radius:9999px;display:inline-flex;align-items:center;padding:2px;transition:all .2s;
+      background:#2a2f32;
+    }
+    .wa-switch span::after{
+      content:""; width:20px;height:20px;background:#e9edef;border-radius:9999px;transform:translateX(0);transition:transform .2s;
+    }
+    .wa-switch input:checked + span::after{ transform:translateX(20px); }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden bg-[#111b21] text-[#e9edef]">
+
+  <!-- LOGIN -->
+  <div id="loginModal" class="fixed inset-0 flex items-center justify-center bg-black/70 z-50">
+    <div class="bg-[#1f2c33] text-[#e9edef] p-8 rounded-xl w-[380px] shadow-2xl">
+      <div class="text-center mb-6">
+        <div class="inline-flex items-center gap-2 text-2xl font-semibold">
+          <i class="fa-brands fa-whatsapp text-[var(--wa-accent)]"></i>
+          SupportLive
+        </div>
+        <div class="text-sm opacity-70 mt-1">Admin / Agent Login</div>
+      </div>
+      <div class="space-y-3">
+        <input id="loginUsername" type="text" placeholder="Username" class="w-full bg-[#2a2f32] rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--wa-accent)]"/>
+        <input id="loginPassword" type="password" placeholder="Password" class="w-full bg-[#2a2f32] rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--wa-accent)]"/>
+        <button id="loginBtn" class="w-full py-2 rounded-lg bg-[var(--wa-accent)] text-[#0b141a] font-semibold hover:brightness-110 transition">Login</button>
+        <div id="loginError" class="hidden text-red-400 text-sm text-center">Invalid username or password</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <!-- ✅ min-h-0 lets inner flex children scroll -->
+  <div id="portal" class="hidden h-full grid grid-cols-[380px_1fr] min-h-0">
+
+    <!-- LEFT: chats/agents list -->
+    <aside class="flex flex-col border-r border-[#202c33] min-h-0">
+      <!-- app header -->
+      <div class="topbar px-4 py-3 flex items-center justify-between">
+        <div class="inline-flex items-center gap-2 text-lg font-semibold">
+          <i class="fa-brands fa-whatsapp"></i> Elilhaam DB
+        </div>
+        <div class="flex items-center gap-1">
+          <button id="chatsMenu" class="icon-btn" title="Chats">
+            <i class="fa-solid fa-comments"></i>
+          </button>
+          <button id="agentsMenu" class="icon-btn" title="Agents">
+            <i class="fa-solid fa-user-group"></i>
+          </button>
+          <button id="instaMenu" class="icon-btn" title="Instagram">
+            <i class="fa-brands fa-instagram text-pink-500"></i>
+          </button>
+          <button id="logoutBtn" class="icon-btn" title="Logout">
+            <i class="fa-solid fa-right-from-bracket"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- search -->
+      <div class="subbar px-3 py-2">
+        <div class="flex items-center gap-2 bg-[#2a2f32] rounded-lg px-3 py-2">
+          <i class="fa-solid fa-magnifying-glass opacity-70"></i>
+          <input id="searchClient" class="bg-transparent outline-none w-full text-sm" placeholder="Search chats / agents"/>
+        </div>
+      </div>
+
+      <!-- toolbar (agents) -->
+      <div id="agentsToolbar" class="hidden px-3 py-2 subbar border-t border-[#202c33]">
+        <button id="addAgentBtn" class="px-3 py-2 bg-[var(--wa-accent)] text-[#0b141a] rounded-lg font-medium hover:brightness-110">
+          <i class="fa fa-plus mr-2"></i>Add Agent
+        </button>
+      </div>
+
+      <!-- lists -->
+      <div class="flex-1 overflow-y-auto thin-scroll bg-[#111b21]">
+        <ul id="clientList" class="divide-y divide-[#202c33]"></ul>
+        <ul id="agentList" class="hidden divide-y divide-[#202c33]"></ul>
+      </div>
+
+      <!-- signed in footer -->
+      <div class="subbar px-4 py-3 border-t border-[#202c33]">
+        <div class="text-xs opacity-70">Signed in as</div>
+        <div id="agentInfo" class="font-medium"></div>
+      </div>
+    </aside>
+
+    <!-- RIGHT: panel area -->
+    <main class="flex flex-col pane-border min-h-0">
+
+      <!-- chat header -->
+      <div id="chatHeaderBar" class="topbar px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div id="activeAvatar" class="avatar seed-3">CL</div>
+          <div>
+            <div id="activeClientTitle" class="font-semibold">Select a chat</div>
+            <div class="text-xs opacity-80">end to end encrypted</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 opacity-90">
+          <button class="icon-btn" title="Search in chat"><i class="fa-solid fa-magnifying-glass"></i></button>
+          <button class="icon-btn" title="More"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+        </div>
+      </div>
+
+      <!-- CHAT VIEW -->
+      <!-- ✅ min-h-0 ensures the inner chat area can scroll -->
+      <section id="chatPane" class="flex flex-1 flex-col min-h-0">
+        <!-- messages -->
+        <!-- ✅ overflow-y-auto added so chat scrolls -->
+        <div id="chat-window" class="flex-1 wa-chat-bg thin-scroll p-6 flex flex-col gap-2 overflow-y-auto"></div>
+
+        <!-- composer (always visible when chat pane visible) -->
+        <form id="chatForm" class="subbar px-3 py-3 flex items-center gap-2 hidden">
+          <button type="button" id="emojiBtn" class="icon-btn" title="Emoji">
+            <i class="fa-regular fa-face-smile"></i>
+          </button>
+          <button type="button" id="fileBtn" class="icon-btn" title="Attach">
+            <i class="fa-solid fa-paperclip -rotate-45"></i>
+          </button>
+          <input id="fileInput" type="file" class="hidden" accept="image/*,video/*,application/pdf,.doc,.docx" />
+          <input id="chatInput" type="text" class="input-pill" placeholder="Type a message" />
+          <button type="submit" class="icon-btn" title="Send">
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </form>
+      </section>
+
+      <!-- AGENT EDIT VIEW (WhatsApp-styled) -->
+      <!-- ✅ min-h-0 + overflow-y-auto so this pane scrolls too -->
+      <section id="agentEditPane" class="hidden flex-1 overflow-y-auto thin-scroll bg-[#111b21] min-h-0">
+        <div class="max-w-2xl w-full mx-auto p-6">
+          <div class="wa-card p-5">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-3">
+                <div class="avatar seed-6" id="agentEditAvatar">AG</div>
+                <div>
+                  <div class="font-semibold text-lg">Edit Agent</div>
+                  <div class="text-xs opacity-70">WhatsApp style settings</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="cancelAgentEdit" class="px-3 py-2 rounded-lg bg-[#2a2f32] hover:bg-[#1f2c33]">Cancel</button>
+                <button id="saveAgentEdit" class="px-3 py-2 rounded-lg bg-[var(--wa-accent)] text-[#0b141a] font-semibold hover:brightness-110">Save</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <div class="wa-label mb-1">Username</div>
+                <input id="editUsername" class="wa-field w-full" placeholder="Username"/>
+              </div>
+              <div>
+                <div class="wa-label mb-1">New Password <span class="opacity-60">(leave blank to keep)</span></div>
+                <input id="editPassword" type="password" class="wa-field w-full" placeholder="••••••••"/>
+              </div>
+            </div>
+
+            <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label class="flex items-center justify-between wa-card p-4">
+                <div>
+                  <div class="font-medium">Number Masking</div>
+                  <div class="text-sm opacity-70">Hide parts of client numbers</div>
+                </div>
+                <div class="wa-switch">
+                  <input id="permNumberMasking" type="checkbox" class="hidden">
+                  <span></span>
+                </div>
+              </label>
+
+              <label class="flex items-center justify-between wa-card p-4">
+                <div>
+                  <div class="font-medium">Add/Delete Agents</div>
+                  <div class="text-sm opacity-70">Allow managing other agents</div>
+                </div>
+                <div class="wa-switch">
+                  <input id="permAddDelete" type="checkbox" class="hidden">
+                  <span></span>
+                </div>
+              </label>
+            </div>
+
+            <div class="mt-6">
+              <div class="wa-label mb-1">Notes</div>
+              <textarea id="editNotes" class="wa-field w-full min-h-[80px]" placeholder="Optional notes (not saved in API – UI only)"></textarea>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+ <!-- Notification Sound -->
+  <audio id="notificationSound" src="https://jury-enlargement-graphical-talks.trycloudflare.com/uploads/agents/ding.mp3" preload="auto"></audio>
+
+
+  <!-- SOCKET -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    /********************************************************************
+     * CONFIG
+     *
+     * Set your current ngrok (or localtunnel) URL here. Update this
+     * every time the tunnel URL changes (or store it in environment).
+     ********************************************************************/
+    const NGROK_URL = 'https://jury-enlargement-graphical-talks.trycloudflare.com'; // <-- update as needed
+    const apiBase = NGROK_URL + '/api';
+
+    // Set the chat background image URL (was a localhost URL previously)
+    document.addEventListener('DOMContentLoaded', () => {
+      const chatBgEls = document.getElementsByClassName('wa-chat-bg');
+      for (const el of chatBgEls) {
+        el.style.backgroundImage = `url("${NGROK_URL}/uploads/CHAT-2.png")`;
+      }
+    });
+
+    /********************************************************************
+     * apiFetch wrapper
+     *
+     * Simplified: no ngrok header, just pass through options and include credentials.
+     ********************************************************************/
+    async function apiFetch(path, options = {}) {
+      // Accept either full URL or path
+      let url = path.startsWith('http') ? path : (apiBase + (path.startsWith('/') ? path : '/' + path));
+      const fetchOptions = {
+        credentials: 'include',
+        ...options,
+        headers: {
+          ...(options.headers || {})
+        }
+      };
+      return fetch(url, fetchOptions);
+    }
+
+    /********************************************************************
+     * State + DOM refs
+     ********************************************************************/
+    // State
+    let agent = null;
+    let clients = {};        // phone -> { phone, messages: [] }
+    let activeClient = null; // { phone, messages: [] }
+    let currentMenu = 'chats';
+    let socket;
+
+    // Agent edit state
+    let editingAgentId = null;
+
+    // Els
+    const loginModal = document.getElementById('loginModal');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginUsername = document.getElementById('loginUsername');
+    const loginPassword = document.getElementById('loginPassword');
+    const loginError = document.getElementById('loginError');
+
+    const portal = document.getElementById('portal');
+    const chatsMenu = document.getElementById('chatsMenu');
+    const agentsMenu = document.getElementById('agentsMenu');
+    const addAgentBtn = document.getElementById('addAgentBtn');
+    const agentsToolbar = document.getElementById('agentsToolbar');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    const clientListEl = document.getElementById('clientList');
+    const agentListEl = document.getElementById('agentList');
+    const searchClient = document.getElementById('searchClient');
+
+    const chatHeaderBar = document.getElementById('chatHeaderBar');
+    const chatPane = document.getElementById('chatPane');
+    const chatWindow = document.getElementById('chat-window');
+    const chatForm = document.getElementById('chatForm');
+    const chatInput = document.getElementById('chatInput');
+    const fileInput = document.getElementById('fileInput');
+    const fileBtn = document.getElementById('fileBtn');
+
+    const agentInfo = document.getElementById('agentInfo');
+    const activeClientTitle = document.getElementById('activeClientTitle');
+    const activeAvatar = document.getElementById('activeAvatar');
+
+    // Agent Edit Pane els
+    const agentEditPane = document.getElementById('agentEditPane');
+    const agentEditAvatar = document.getElementById('agentEditAvatar');
+    const editUsername = document.getElementById('editUsername');
+    const editPassword = document.getElementById('editPassword');
+    const permNumberMasking = document.getElementById('permNumberMasking');
+    const permAddDelete = document.getElementById('permAddDelete');
+    const saveAgentEdit = document.getElementById('saveAgentEdit');
+    const cancelAgentEdit = document.getElementById('cancelAgentEdit');
+
+    /********************************************************************
+     * Helpers masking
+     ********************************************************************/
+    function maskPhone(phone){
+      if(!phone) return '';
+	   phone = String(phone); 
+      if(phone.length<=4) return phone;
+      return phone.slice(0,4) + '****' + phone.slice(-3);
+    }
+    function formatTimestamp(date){
+      const d = new Date(date);
+      let h = d.getHours();
+      const m = String(d.getMinutes()).padStart(2,'0');
+      const ampm = h>=12 ? 'PM':'AM';
+      h = h%12 || 12;
+      return `${h}:${m} ${ampm}`;
+    }
+    function seedFor(text){
+      const n = (text || '').split('').reduce((a,c)=>a+(c.charCodeAt(0)||0),0);
+      return n % 10;
+    }
+    function initialsFrom(phone){
+      const s = maskPhone(phone);
+      return s.replace(/[^\d]/g,'').slice(0,2) || 'CL';
+    }
+
+    /********************************************************************
+     * Login flow
+     ********************************************************************/
+    async function login(username,password){
+      loginError.classList.add('hidden');
+      try{
+        const res = await apiFetch('/agent/login',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({username,password})
+        });
+        const data = await res.json();
+        if(data.success){
+          agent = data.agent;
+          localStorage.setItem('agent', JSON.stringify(agent));
+          showPortal();
+          await initPortal();
+        } else {
+          loginError.textContent = data.message || 'Invalid username or password';
+          loginError.classList.remove('hidden');
+        }
+      }catch(e){
+        console.error(e);
+        loginError.classList.remove('hidden');
+      }
+    }
+    function showPortal(){
+      loginModal.classList.add('hidden');
+      portal.classList.remove('hidden');
+      agentInfo.textContent = agent?.username || '';
+    }
+
+    /********************************************************************
+     * Init: restore session if present
+     ********************************************************************/
+    window.addEventListener('load', async ()=>{
+      const stored = localStorage.getItem('agent');
+      if(stored){
+        agent = JSON.parse(stored);
+        showPortal();
+        await initPortal();
+      }
+    });
+
+    loginBtn.addEventListener('click',()=>{
+      const u = loginUsername.value.trim();
+      const p = loginPassword.value.trim();
+      if(!u || !p) return;
+      login(u,p);
+    });
+
+    logoutBtn.addEventListener('click', ()=>{
+      localStorage.removeItem('agent');
+      agent = null;
+      activeClient = null;
+      clients = {};
+      portal.classList.add('hidden');
+      loginModal.classList.remove('hidden');
+      clientListEl.innerHTML = '';
+      agentListEl.innerHTML = '';
+      chatWindow.innerHTML = '';
+      if(socket) socket.disconnect();
+    });
+
+    /********************************************************************
+     * Portal initialization
+     ********************************************************************/
+    async function initPortal(){
+      // Socket.IO: connect to NGROK_URL (not /api)
+      try {
+        socket = io(NGROK_URL, {
+          transports: ['websocket','polling'],
+          reconnection: true,
+          reconnectionAttempts: 10,
+          reconnectionDelay: 1000
+        });
+
+        // Socket events & reconnect handling
+        socket.on('connect', () => console.log('🔌 Socket connected:', socket.id));
+        socket.on('connect_error', (err) => console.warn('⚠️ Socket connect_error:', err));
+        socket.on('reconnect_attempt', (attempt) => console.log('🔁 Reconnect attempt', attempt));
+        socket.on('reconnect', (attempt) => console.log('✅ Socket reconnected after', attempt, 'attempt(s)'));
+        socket.on('disconnect', (reason) => console.log('❌ Socket disconnected:', reason));
+
+     // Incoming message from client or other agents
+  socket.on('chat message', (msg) => {
+    console.log("📩 Incoming message:", msg);
+    handleIncomingMessage(msg);
+  });
+
+  // Typing indicator from client
+  socket.on('typing', (data) => {
+    console.log("✍️ Typing event:", data);
+    showTypingIndicator(data.phone, data.isTyping);
+  });
+
+  // Agent presence updates
+  socket.on('agent status', (data) => {
+    console.log("👤 Agent status update:", data);
+    updateAgentStatus(data.agentId, data.online);
+  });
+
+} catch (e) {
+  console.warn('Socket connect error:', e);
+}
+
+// Load clients and render initial list
+await loadClients();
+renderClientList();
+
+// Show chat form
+chatForm.classList.remove('hidden');
+
+      // UI menu behavior
+      chatsMenu.addEventListener('click', ()=>{
+        currentMenu = 'chats';
+        // Show chat pane, hide edit pane
+        agentEditPane.classList.add('hidden');
+        chatPane.classList.remove('hidden');
+        chatHeaderBar.classList.remove('hidden');
+
+        agentListEl.classList.add('hidden');
+        agentsToolbar.classList.add('hidden');
+        clientListEl.classList.remove('hidden');
+        renderClientList(searchClient.value);
+      });
+
+      agentsMenu.addEventListener('click', ()=>{
+        currentMenu = 'agents';
+        // show agent list
+        clientListEl.classList.add('hidden');
+        agentListEl.classList.remove('hidden');
+        agentsToolbar.classList.remove('hidden');
+        loadAgents(searchClient.value);
+      });
+
+      searchClient.addEventListener('input', ()=>{
+        if(currentMenu==='chats') renderClientList(searchClient.value);
+        else loadAgents(searchClient.value);
+      });
+
+      // Send text message
+      // Send text message
+chatForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!activeClient) return;
+
+  const text = chatInput.value.trim();
+  if (!text) return;
+
+  try {
+    const res = await apiFetch("/api/admin/send-message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        phone: activeClient.id || activeClient.jid || activeClient.number,
+        text
+      })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      pushMessage(activeClient.id || activeClient.jid || activeClient.number, {
+        text,
+        sender: "Admin",
+        timestamp: new Date(),
+        isFile: false
+      });
+      chatInput.value = "";
+    }
+  } catch (err) {
+    console.error("Send message error:", err);
+  }
+});
+
+
+      // Send file
+      fileBtn.addEventListener('click', ()=>{ if(activeClient) fileInput.click(); });
+      fileInput.addEventListener('change', async ()=>{
+        if(!activeClient || !fileInput.files[0]) return;
+        const fd = new FormData();
+        fd.append('phone', activeClient.phone);
+        fd.append('file', fileInput.files[0]);
+        try{
+          const res = await apiFetch('/admin/send-file', { method:'POST', body: fd });
+          const data = await res.json();
+          if(data.success){
+            pushMessage(activeClient.phone, { text:'', sender:'Admin', isFile:true, fileUrl:data.fileUrl, timestamp:new Date() });
+          }
+        }catch(e){ console.error(e); }
+      });
+
+      // Add agent (simple prompts remain)
+// 🔹 Setup Add Agent button based on agent permissions
+function setupAddAgentButton() {
+  // Remove any old click listeners (prevents duplicates)
+  const newBtn = addAgentBtn.cloneNode(true);
+  addAgentBtn.parentNode.replaceChild(newBtn, addAgentBtn);
+  addAgentBtn = newBtn;
+
+  if (!agent?.permissions?.addDelete) {
+    addAgentBtn.style.display = "none";   // hide button if not allowed
+    return;
+  }
+
+  addAgentBtn.style.display = "inline-block"; // show button if allowed
+  addAgentBtn.addEventListener('click', async ()=> {
+    const username = prompt('New agent username:');
+    if (!username) return;
+    const password = prompt('Set password:');
+    try {
+      const res = await apiFetch('/agent/create', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ 
+          username, 
+          password, 
+          email: `${username}@example.com`, 
+          permissions: { numberMasking:false, addDelete:false } 
+        })
+      });
+      const data = await res.json();
+      if (data.success) { 
+        alert('✅ Agent created'); 
+        loadAgents(searchClient.value); 
+      } else {
+        alert('❌ Failed to create agent');
+      }
+    } catch(e) { 
+      console.error(e); 
+      alert('❌ Error'); 
+    }
+  });
+}
+
+
+// Save / Cancel agent edit
+saveAgentEdit.addEventListener('click', saveAgentEdits);
+cancelAgentEdit.addEventListener('click', ()=>{
+  // hide edit, go back to chats
+  agentEditPane.classList.add('hidden');
+  chatPane.classList.remove('hidden');
+  chatHeaderBar.classList.remove('hidden');
+  currentMenu = 'chats';
+  clientListEl.classList.remove('hidden');
+  agentListEl.classList.add('hidden');
+  agentsToolbar.classList.add('hidden');
+});
+
+    }
+
+    /********************************************************************
+     * Clients / Agents lists
+     ********************************************************************/
+   async function loadClients(){
+  try {
+    const res = await apiFetch('/chats');
+    const data = await res.json();
+
+    if (data.success) {
+      // store as array (not object)
+      clients = data.chats || [];
+      renderClientList(searchClient.value);
+    } else {
+      console.warn("Failed to load clients", data.message);
+    }
+  } catch (err) {
+    console.error("loadClients error:", err);
+  }
+}
+function renderClientList(filter = "") {
+  clientListEl.innerHTML = "";
+
+  clients.forEach(c => {
+    const phone = c.id || c.jid || c.number;
+    let displayName;
+
+    // 🟢 Handle number masking
+    if (agent?.permissions?.numberMasking) {
+      if (c.formattedTitle && isNaN(c.formattedTitle.replace(/\D/g, "")) && c.name) {
+        displayName = c.formattedTitle || c.name;
+      } else {
+        displayName = maskPhone(phone);
+      }
+    } else {
+      displayName = c.formattedTitle || c.name || phone;
+    }
+
+    // 🟢 Apply search filter
+    if (filter && !displayName.toLowerCase().includes(filter.toLowerCase())) {
+      return;
+    }
+
+    // 🟢 Last message & time
+    let lastMsg = "";
+    if (c.messages?.length) {
+      const m = c.messages[c.messages.length - 1];
+      if (m.isFile) {
+        lastMsg = "📎 File";
+      } else {
+        lastMsg = m.text || "";
+      }
+    }
+
+    const lastTime = c.messages?.length
+      ? formatTimestamp(c.messages[c.messages.length - 1].timestamp)
+      : "";
+
+    // 🔔 Unread count
+    const unread = c.unreadCount || 0;
+
+    // 🟢 Container
+    const div = document.createElement("div");
+    div.className =
+      "client flex items-center justify-between p-2 cursor-pointer hover:bg-gray-100";
+    div.onclick = () => {
+      setActiveClient(phone);
+      c.unreadCount = 0; // reset after opening
+      renderClientList(filter);
+    };
+
+    // Left: Avatar + Name + Last message
+    const left = document.createElement("div");
+    left.className = "flex items-center gap-3 min-w-0"; // ✅ min-w-0 so text truncates
+
+    const avatar = document.createElement("div");
+    avatar.className =
+      `avatar seed-${seedFor(phone)} w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-gray-200`;
+    avatar.textContent = initialsFrom(displayName);
+
+    const textBox = document.createElement("div");
+    textBox.className = "flex flex-col truncate";
+
+    const title = document.createElement("div");
+    title.className = "font-medium truncate max-w-[140px]";
+    title.textContent = displayName;
+
+    const preview = document.createElement("div");
+    preview.className = "text-xs text-gray-500 truncate max-w-[160px]";
+    preview.textContent = lastMsg;
+
+    textBox.appendChild(title);
+    textBox.appendChild(preview);
+
+    left.appendChild(avatar);
+    left.appendChild(textBox);
+
+    // Right: Time + Unread badge
+    const right = document.createElement("div");
+    right.className = "flex flex-col items-end gap-1 flex-shrink-0";
+
+    const timeEl = document.createElement("div");
+    timeEl.className = "text-xs text-gray-400";
+    timeEl.textContent = lastTime;
+
+    right.appendChild(timeEl);
+
+    if (unread > 0) {
+      const badge = document.createElement("span");
+      badge.className =
+        "bg-green-500 text-white text-xs px-2 py-0.5 rounded-full";
+      badge.textContent = unread;
+      right.appendChild(badge);
+    }
+
+    div.appendChild(left);
+    div.appendChild(right);
+
+    clientListEl.appendChild(div);
+  });
+}
+
+
+
+
+   async function loadAgents(filter=''){
+  agentListEl.innerHTML = '';
+  try {
+    const res = await apiFetch('/agent/all');
+    const data = await res.json();
+    if (!(data.success && Array.isArray(data.agents))) return;
+
+    data.agents
+      .filter(a => (a.username || '').toLowerCase().includes((filter||'').toLowerCase()))
+      .forEach(a => {
+        const li = document.createElement('li');
+        li.className = 'px-3 py-3 flex items-center gap-3';
+        const avatarText = (a.username||'AG').slice(0,2).toUpperCase();
+        const seed = seedFor(avatarText);
+
+        // 🔹 Build action buttons depending on permission
+        let actionsHTML = `
+          <button data-action="call" data-id="${a._id}" data-phone="${a.phone || ''}" class="opacity-80 hover:opacity-100 text-green-400">
+            <i class="fa fa-phone"></i>
+          </button>
+        `;
+
+        if (agent?.permissions?.addDelete) {
+          actionsHTML += `
+            <button data-action="edit" data-id="${a._id}" class="opacity-80 hover:opacity-100">
+              <i class="fa fa-pen"></i>
+            </button>
+            <button data-action="delete" data-id="${a._id}" class="opacity-80 hover:opacity-100 text-red-400">
+              <i class="fa fa-trash"></i>
+            </button>
+          `;
+        }
+
+        li.innerHTML = `
+          <div class="avatar seed-${seed}">${avatarText}</div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center justify-between gap-3">
+              <div class="truncate font-medium">${a.username}</div>
+              <div class="flex items-center gap-2">
+                ${actionsHTML}
+              </div>
+            </div>
+            <div class="text-xs opacity-70 truncate">${a.email || ''}</div>
+          </div>
+        `;
+
+        // 🔹 Attach listeners only if allowed
+        li.addEventListener('click', (e)=>{
+          const btn = e.target.closest('button');
+          if(!btn) return;
+          const action = btn.dataset.action;
+          const id = btn.dataset.id;
+
+          if (action === 'edit' && agent?.permissions?.addDelete) {
+            openAgentEdit(id);
+          }
+          if (action === 'delete' && agent?.permissions?.addDelete) {
+            deleteAgent(id);
+          }
+        });
+
+        agentListEl.appendChild(li);
+      });
+  } catch(e) { 
+    console.error('loadAgents error', e); 
+  }
+}
+
+    /********************************************************************
+     * Agent edit flow
+     ********************************************************************/
+    async function openAgentEdit(id){
+      try{
+        const res = await apiFetch(`/agent/${id}`);
+        const data = await res.json();
+        if(!data.success) return alert('❌ Could not load agent');
+
+        editingAgentId = id;
+
+        // Populate fields
+        editUsername.value = data.agent.username || '';
+        editPassword.value = '';
+        permNumberMasking.checked = !!(data.agent.permissions && data.agent.permissions.numberMasking);
+        permAddDelete.checked = !!(data.agent.permissions && data.agent.permissions.addDelete);
+
+        const avSeed = seedFor(data.agent.username || 'AG');
+        agentEditAvatar.className = `avatar seed-${avSeed}`;
+        agentEditAvatar.textContent = (data.agent.username || 'AG').slice(0,2).toUpperCase();
+
+        // Show edit pane, hide chat pane
+        chatPane.classList.add('hidden');
+        chatHeaderBar.classList.add('hidden');
+        agentEditPane.classList.remove('hidden');
+
+        // Focus
+        setTimeout(()=>editUsername.focus(), 50);
+
+      }catch(e){ console.error(e); alert('❌ Error'); }
+    }
+
+   async function saveAgentEdits(){
+  if(!editingAgentId) return;
+
+  const body = {
+    username: editUsername.value.trim(),
+    permissions: {
+      numberMasking: !!permNumberMasking.checked,
+      addDelete: !!permAddDelete.checked
+    }
+  };
+
+  if(editPassword.value.trim()){
+    body.password = editPassword.value.trim();
+  }
+
+  try {
+    const res = await apiFetch(`/agent/${editingAgentId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify(body)
+    });
+    const upd = await res.json();
+
+    if (upd.success) {
+      alert('✅ Agent updated');
+
+      // 🔑 If the agent being edited is the logged-in agent → refresh local state
+      if (agent && agent._id === editingAgentId) {
+        agent = { ...agent, ...upd.agent };
+        localStorage.setItem("agent", JSON.stringify(agent));
+        renderClientList(searchClient.value); // re-render with new masking
+      }
+
+      agentEditPane.classList.add('hidden');
+      chatPane.classList.remove('hidden');
+      chatHeaderBar.classList.remove('hidden');
+
+      loadAgents(searchClient.value);
+      editingAgentId = null;
+    } else {
+      alert('❌ Failed to update agent');
+    }
+  } catch(e) {
+    console.error(e);
+    alert('❌ Error updating agent');
+  }
+}
+
+
+    /********************************************************************
+     * Chat logic
+     ********************************************************************/
+async function setActiveClient(phone) {
+  activeClient = clients.find(c => c.id === phone || c.jid === phone || c.number === phone);
+  if (!activeClient) {
+    console.warn("Client not found:", phone);
+    return;
+  }
+
+  const rawPhone = activeClient.id || activeClient.jid || activeClient.number;
+  let displayName;
+
+  if (agent?.permissions?.numberMasking) {
+    // ✅ Always mask numbers
+    if (activeClient.formattedTitle && isNaN(activeClient.formattedTitle.replace(/\D/g, "")) && activeClient.name) {
+      // if it's a real name (not a phone number)
+      displayName = activeClient.formattedTitle || activeClient.name;
+    } else {
+      displayName = maskPhone(rawPhone);
+    }
+  } else {
+    displayName = activeClient.formattedTitle || activeClient.name || rawPhone;
+  }
+
+  // header
+  activeClientTitle.textContent = displayName;
+  activeAvatar.className = `avatar seed-${seedFor(displayName)}`;
+  activeAvatar.textContent = initialsFrom(displayName);
+
+  // clear chat window
+  chatWindow.innerHTML = "";
+
+
+  try {
+    const res = await apiFetch(`/chats/${encodeURIComponent(phone)}`);
+    const data = await res.json();
+    if (data.success) {
+      // ⬇️ Use data.messages (not data.chats)
+      activeClient.messages = data.messages.map(m => ({
+        text: m.text || m.message || "",
+        sender: m.sender || (m.fromMe ? "Admin" : "Client"),
+        timestamp: m.timestamp || new Date(),
+        isFile: !!m.isFile,
+        fileUrl: m.fileUrl || null
+      }));
+
+      renderMessages(activeClient.messages);
+    }
+  } catch (e) {
+    console.error("setActiveClient error:", e);
+  }
+}
+
+
+
+
+
+
+
+
+function pushMessage(phone, msg) {
+  let client = clients.find(
+    c => c.id === phone || c.jid === phone || c.number === phone
+  );
+
+  if (!client) {
+    client = { id: phone, number: phone, messages: [], unreadCount: 0 };
+    clients.push(client);
+  }
+
+  // ✅ Normalize message object
+  const messageObj = {
+    text: msg.text || msg.message || "",
+    sender: msg.sender || "Client",
+    timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+    isFile: !!msg.isFile,
+    fileUrl: msg.fileUrl || ""
+  };
+
+  if (!client.messages) client.messages = [];
+  client.messages.push(messageObj);
+
+  // 🔔 Unread count handling
+  if (
+    !activeClient ||
+    (activeClient.id !== phone &&
+      activeClient.jid !== phone &&
+      activeClient.number !== phone)
+  ) {
+    client.unreadCount = (client.unreadCount || 0) + 1;
+  } else {
+    client.unreadCount = 0;
+  }
+
+  // 🟢 Move this client to top
+  clients = [client, ...clients.filter(c => c !== client)];
+
+  // 🔄 Refresh sidebar
+   // 🔄 Refresh sidebar so preview + time update immediately
+  if (currentMenu === "chats") {
+    renderClientList(searchClient.value);
+  }
+  // 🖼 Update messages if this is active chat
+  if (
+    activeClient &&
+    (activeClient.id === phone ||
+      activeClient.jid === phone ||
+      activeClient.number === phone)
+  ) {
+    renderMessages(client.messages);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  }
+}
+
+// 🔧 Backend base URL
+const BASE_URL = "https://jennifer-agricultural-absence-due.trycloudflare.com";
+
+// 🔗 Convert URLs to clickable links
+function linkify(text) {
+  if (!text) return "";
+  const urlRegex = /((https?:\/\/|www\.)[^\s]+)/g;
+  return text.replace(urlRegex, url => {
+    const href = url.startsWith("http") ? url : `http://${url}`;
+    return `<a href="${href}" target="_blank" class="text-blue-400 underline break-words">${url}</a>`;
+  });
+}
+// 🔗 Converts any file URL to a fully qualified URL
+function normalizeFileUrl(fileUrl) {
+  if (!fileUrl) return "";
+
+  // If it's already an absolute URL
+  if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) return fileUrl;
+
+  // If it's a local dev server path
+  if (fileUrl.startsWith("/")) return `${BASE_URL}${fileUrl}`;
+
+  // Otherwise, prepend BASE_URL by default
+  return `${BASE_URL}/${fileUrl}`;
+}
+
+// Updated renderMessages for reliable file rendering
+function renderMessages(messages) {
+  chatWindow.innerHTML = "";
+  const messagesToRender = messages.slice(-50);
+
+  messagesToRender.forEach((m, idx) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = `flex ${m.sender === "Admin" ? "justify-end" : "justify-start"} my-[2px]`;
+    wrapper.dataset.msgIndex = idx;
+
+    const bubble = document.createElement("div");
+    bubble.className = `bubble ${m.sender === "Admin" ? "me" : "them"} shadow p-2 relative`;
+    bubble.dataset.msgIndex = idx;
+
+    // Text
+    const textDiv = document.createElement("div");
+    textDiv.className = "break-words mb-1";
+    textDiv.innerHTML = linkify(m.text);
+    bubble.appendChild(textDiv);
+
+    // File handling
+    if (m.isFile && m.fileUrl) {
+      const fileUrl = normalizeFileUrl(m.fileUrl);
+
+      if (fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+        const img = document.createElement("img");
+        img.src = fileUrl;
+        img.className = "rounded-md max-w-[240px] max-h-[180px] object-contain border";
+        bubble.appendChild(img);
+      } else if (fileUrl.match(/\.(mp4|webm|ogg)$/i)) {
+        const video = document.createElement("video");
+        video.src = fileUrl;
+        video.controls = true;
+        video.className = "rounded-md max-w-[260px] max-h-[200px]";
+        bubble.appendChild(video);
+      } else {
+        const a = document.createElement("a");
+        a.href = fileUrl;
+        a.target = "_blank";
+        a.textContent = "📎 Download file";
+        a.className = "underline text-blue-400";
+        bubble.appendChild(a);
+      }
+    }
+
+  
+
+    // Meta info
+    const meta = document.createElement("div");
+    meta.className = "meta text-xs text-gray-400 mt-1 flex items-center justify-end";
+
+    const time = document.createElement("span");
+    time.textContent = formatTimestamp(m.timestamp);
+    meta.appendChild(time);
+
+    if (m.sender === "Admin") {
+      const ticks = document.createElement("i");
+      ticks.className = "fa-solid fa-check-double tick ml-1";
+      meta.appendChild(ticks);
+    }
+
+    bubble.appendChild(meta);
+    wrapper.appendChild(bubble);
+    chatWindow.appendChild(wrapper);
+  });
+
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+// Updated handleIncomingMessage for consistent file URLs
+function handleIncomingMessage(msg) {
+  let fileUrl = msg.fileUrl || "";
+  if (fileUrl.startsWith("http://localhost:3001")) fileUrl = fileUrl.replace("http://localhost:3001", NGROK_URL);
+  fileUrl = normalizeFileUrl(fileUrl);
+
+  const messageObj = {
+    text: msg.text || msg.message || "",
+    sender: msg.sender || "Client",
+    timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+    isFile: !!msg.isFile,
+    fileUrl: fileUrl
+  };
+
+  pushMessage(msg.phone, messageObj);
+
+  if (msg.sender === "Client") {
+    const sound = document.getElementById("notificationSound");
+    sound.play().catch(err => console.log("Audio play blocked:", err));
+  }
+}
+
+// Inline Edit
+function inlineEditMessage(idx) {
+  const bubble = chatWindow.querySelector(`.bubble[data-msg-index='${idx}']`);
+  const msg = activeClient.messages[idx];
+  if (!bubble || bubble.querySelector("textarea")) return;
+
+  const textDiv = bubble.querySelector("div");
+  const textarea = document.createElement("textarea");
+  textarea.value = msg.text.replace(" (edited)", "");
+  textarea.className = "w-full border rounded p-1";
+  bubble.insertBefore(textarea, textDiv);
+  textDiv.style.display = "none";
+  textarea.focus();
+
+  const saveEdit = () => {
+    const newText = textarea.value.trim();
+    if (!newText) return;
+    msg.text = newText + " (edited)";
+    renderMessages(activeClient.messages);
+
+    if (!msg.isFile && msg.id) {
+      socket.emit("editMessage", {
+        phone: activeClient.id,
+        messageId: msg.id,
+        newText
+      });
+    }
+  };
+
+  textarea.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      saveEdit();
+    } else if (e.key === "Escape") {
+      renderMessages(activeClient.messages);
+    }
+  });
+
+  textarea.addEventListener("blur", saveEdit);
+}
+
+// Delete message
+function deleteMessage(idx) {
+  if (confirm("Delete this message?")) {
+    activeClient.messages.splice(idx, 1);
+    renderMessages(activeClient.messages);
+  }
+}
+
+
+</script>
+</body>
+</html>
