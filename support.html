@@ -664,100 +664,47 @@ fileInput.addEventListener('change', async () => {
 });
 
       // Add agent (simple prompts remain)
-// 🔹 Setup Add Agent button with proper permissions and click handling
-async function setupAddAgentButton() {
-  // Select the button from DOM
-  const addAgentBtn = document.getElementById('addAgentBtn');
-  if (!addAgentBtn) {
-    console.warn('Add Agent button not found in DOM!');
-    return;
-  }
-
-  // Fetch current agent if not already defined
-  if (!window.agent) {
-    try {
-      const res = await fetch('http://localhost:3001/api/agents');
-      const data = await res.json();
-      if (data.success && data.agents.length > 0) {
-        window.agent = data.agents[0]; // use first agent or customize as needed
-      } else {
-        console.warn('No agents found or failed to load agent permissions');
-        addAgentBtn.style.display = 'none';
-        return;
-      }
-    } catch (err) {
-      console.error('Failed to fetch agent info:', err);
-      addAgentBtn.style.display = 'none';
-      return;
-    }
-  }
-
-  // Check agent permissions
-  if (!agent?.permissions?.addDelete) {
-    addAgentBtn.style.display = "none"; // hide if not allowed
-    return;
-  } else {
-    addAgentBtn.style.display = "inline-block"; // show if allowed
-  }
-
-  // Remove any existing click listeners safely
+// 🔹 Setup Add Agent button based on agent permissions
+function setupAddAgentButton() {
+  // Remove any old click listeners (prevents duplicates)
   const newBtn = addAgentBtn.cloneNode(true);
   addAgentBtn.parentNode.replaceChild(newBtn, addAgentBtn);
+  addAgentBtn = newBtn;
 
-  // Attach click listener
-  newBtn.addEventListener('click', async () => {
-    const username = prompt('Enter new agent username:');
+  if (!agent?.permissions?.addDelete) {
+    addAgentBtn.style.display = "none";   // hide button if not allowed
+    return;
+  }
+
+  addAgentBtn.style.display = "inline-block"; // show button if allowed
+  addAgentBtn.addEventListener('click', async ()=> {
+    const username = prompt('New agent username:');
     if (!username) return;
-
-    const password = prompt('Set password for the agent:');
-    if (!password) return;
-
+    const password = prompt('Set password:');
     try {
-      const res = await (typeof apiFetch === 'function' 
-        ? apiFetch('/agent/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              username,
-              password,
-              email: `${username}@example.com`,
-              permissions: { numberMasking: false, addDelete: false }
-            })
-          }) 
-        : fetch('http://localhost:3001/api/agent/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              username,
-              password,
-              email: `${username}@example.com`,
-              permissions: { numberMasking: false, addDelete: false }
-            })
-          })
-      );
-
+      const res = await apiFetch('/agent/create', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ 
+          username, 
+          password, 
+          email: `${username}@example.com`, 
+          permissions: { numberMasking:false, addDelete:false } 
+        })
+      });
       const data = await res.json();
-
-      if (data.success) {
-        alert('✅ Agent created successfully!');
-        if (typeof loadAgents === 'function') {
-          loadAgents(searchClient?.value || '');
-        }
+      if (data.success) { 
+        alert('✅ Agent created'); 
+        loadAgents(searchClient.value); 
       } else {
-        alert(`❌ Failed to create agent: ${data.message || 'Unknown error'}`);
+        alert('❌ Failed to create agent');
       }
-    } catch (error) {
-      console.error('Error creating agent:', error);
-      alert('❌ Error creating agent');
+    } catch(e) { 
+      console.error(e); 
+      alert('❌ Error'); 
     }
   });
 }
-
-// 🔹 Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  setupAddAgentButton();
-});
-
 
 
 // Save / Cancel agent edit
