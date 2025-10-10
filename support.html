@@ -607,63 +607,157 @@ chatForm.addEventListener("submit", async (e) => {
 
 
       // Send file
-      fileBtn.addEventListener('click', ()=>{ if(activeClient) fileInput.click(); });
-      fileInput.addEventListener('change', async ()=>{
-        if(!activeClient || !fileInput.files[0]) return;
-        const fd = new FormData();
-        fd.append('phone', activeClient.phone);
-        fd.append('file', fileInput.files[0]);
-        try{
-          const res = await apiFetch('/admin/send-file', { method:'POST', body: fd });
-          const data = await res.json();
-          if(data.success){
-            pushMessage(activeClient.phone, { text:'', sender:'Admin', isFile:true, fileUrl:data.fileUrl, timestamp:new Date() });
-          }
-        }catch(e){ console.error(e); }
-      });
+      // 📎 Send file handler
+fileBtn.addEventListener('click', () => {
+  if (activeClient) {
+    fileInput.click();
+  } else {
+    alert('Please select a chat before sending a file.');
+  }
+});
 
-      // Add agent (simple prompts remain)
-// 🔹 Setup Add Agent button based on agent permissions
-function setupAddAgentButton() {
-  // Remove any old click listeners (prevents duplicates)
-  const newBtn = addAgentBtn.cloneNode(true);
-  addAgentBtn.parentNode.replaceChild(newBtn, addAgentBtn);
-  addAgentBtn = newBtn;
+fileInput.addEventListener('change', async () => {
+  if (!activeClient || !fileInput.files[0]) return;
 
-  if (!agent?.permissions?.addDelete) {
-    addAgentBtn.style.display = "none";   // hide button if not allowed
+  // ✅ Safely extract phone number
+  const phone =
+    activeClient.phone ||
+    (activeClient.jid ? activeClient.jid.split('@')[0] : null);
+
+  if (!phone) {
+    console.error('❌ No phone number found for activeClient:', activeClient);
+    alert('Cannot send file — missing phone number.');
     return;
   }
 
-  addAgentBtn.style.display = "inline-block"; // show button if allowed
-  addAgentBtn.addEventListener('click', async ()=> {
-    const username = prompt('New agent username:');
-    if (!username) return;
-    const password = prompt('Set password:');
-    try {
-      const res = await apiFetch('/agent/create', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ 
-          username, 
-          password, 
-          email: `${username}@example.com`, 
-          permissions: { numberMasking:false, addDelete:false } 
-        })
+  const fd = new FormData();
+  fd.append('phone', phone);
+  fd.append('file', fileInput.files[0]);
+
+  try {
+    // ✅ Use regular fetch instead of custom apiFetch (safer for FormData)
+    const res = await fetch(`${apiBase}/admin/send-file`, {
+      method: 'POST',
+      body: fd,
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      pushMessage(phone, {
+        text: '',
+        sender: 'Admin',
+        isFile: true,
+        fileUrl: data.fileUrl,
+        timestamp: new Date(),
       });
+      console.log('✅ File sent successfully:', data.fileUrl);
+    } else {
+      console.error('❌ Upload failed:', data.error);
+      alert(`Upload failed: ${data.error}`);
+    }
+  } catch (e) {
+    console.error('❌ Upload error:', e);
+  } finally {
+    // Reset file input so user can upload again immediately
+    fileInput.value = '';
+  }
+});
+
+      // Add agent (simple prompts remain)
+// 🔹 Setup Add Agent button with proper permissions and click handling
+async function setupAddAgentButton() {
+  // Select the button from DOM
+  const addAgentBtn = document.getElementById('addAgentBtn');
+  if (!addAgentBtn) {
+    console.warn('Add Agent button not found in DOM!');
+    return;
+  }
+
+  // Fetch current agent if not already defined
+  if (!window.agent) {
+    try {
+      const res = await fetch('http://localhost:3001/api/agents');
       const data = await res.json();
-      if (data.success) { 
-        alert('✅ Agent created'); 
-        loadAgents(searchClient.value); 
+      if (data.success && data.agents.length > 0) {
+        window.agent = data.agents[0]; // use first agent or customize as needed
       } else {
-        alert('❌ Failed to create agent');
+        console.warn('No agents found or failed to load agent permissions');
+        addAgentBtn.style.display = 'none';
+        return;
       }
-    } catch(e) { 
-      console.error(e); 
-      alert('❌ Error'); 
+    } catch (err) {
+      console.error('Failed to fetch agent info:', err);
+      addAgentBtn.style.display = 'none';
+      return;
+    }
+  }
+
+  // Check agent permissions
+  if (!agent?.permissions?.addDelete) {
+    addAgentBtn.style.display = "none"; // hide if not allowed
+    return;
+  } else {
+    addAgentBtn.style.display = "inline-block"; // show if allowed
+  }
+
+  // Remove any existing click listeners safely
+  const newBtn = addAgentBtn.cloneNode(true);
+  addAgentBtn.parentNode.replaceChild(newBtn, addAgentBtn);
+
+  // Attach click listener
+  newBtn.addEventListener('click', async () => {
+    const username = prompt('Enter new agent username:');
+    if (!username) return;
+
+    const password = prompt('Set password for the agent:');
+    if (!password) return;
+
+    try {
+      const res = await (typeof apiFetch === 'function' 
+        ? apiFetch('/agent/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username,
+              password,
+              email: `${username}@example.com`,
+              permissions: { numberMasking: false, addDelete: false }
+            })
+          }) 
+        : fetch('http://localhost:3001/api/agent/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username,
+              password,
+              email: `${username}@example.com`,
+              permissions: { numberMasking: false, addDelete: false }
+            })
+          })
+      );
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert('✅ Agent created successfully!');
+        if (typeof loadAgents === 'function') {
+          loadAgents(searchClient?.value || '');
+        }
+      } else {
+        alert(`❌ Failed to create agent: ${data.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error creating agent:', error);
+      alert('❌ Error creating agent');
     }
   });
 }
+
+// 🔹 Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  setupAddAgentButton();
+});
+
 
 
 // Save / Cancel agent edit
@@ -808,7 +902,7 @@ function renderClientList(filter = "") {
    async function loadAgents(filter=''){
   agentListEl.innerHTML = '';
   try {
-    const res = await apiFetch('/agent/all');
+    const res = await apiFetch('/agents');
     const data = await res.json();
     if (!(data.success && Array.isArray(data.agents))) return;
 
@@ -1075,12 +1169,15 @@ const BASE_URL = "https://relaxation-stay-oxford-appeals.trycloudflare.com";
 // 🔗 Convert URLs to clickable links
 function linkify(text) {
   if (!text) return "";
-  const urlRegex = /((https?:\/\/|www\.)[^\s]+)/g;
-  return text.replace(urlRegex, url => {
-    const href = url.startsWith("http") ? url : `http://${url}`;
-    return `<a href="${href}" target="_blank" class="text-blue-400 underline break-words">${url}</a>`;
+
+  // Match only Google Maps URLs
+  const googleMapsRegex = /(https?:\/\/(www\.)?google\.com\/maps[^\s]*)/g;
+
+  return text.replace(googleMapsRegex, url => {
+    return `<a href="${url}" target="_blank" class="text-blue-400 underline break-words">${url}</a>`;
   });
 }
+
 // 🔗 Converts any file URL to a fully qualified URL
 function normalizeFileUrl(fileUrl) {
   if (!fileUrl) return "";
