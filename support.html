@@ -436,7 +436,7 @@
     async function login(username,password){
       loginError.classList.add('hidden');
       try{
-        const res = await apiFetch('/agent/login',{
+        const res = await apiFetch('/agents/login',{
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({username,password})
@@ -919,7 +919,7 @@ function renderClientList(filter = "") {
      ********************************************************************/
     async function openAgentEdit(id){
       try{
-        const res = await apiFetch(`/agent/${id}`);
+        const res = await apiFetch(`/agents/${id}`);
         const data = await res.json();
         if(!data.success) return alert('❌ Could not load agent');
 
@@ -962,7 +962,7 @@ function renderClientList(filter = "") {
   }
 
   try {
-    const res = await apiFetch(`/agent/${editingAgentId}`, {
+    const res = await apiFetch(`/agents/${editingAgentId}`, {
       method: 'PUT',
       headers: { 'Content-Type':'application/json' },
       body: JSON.stringify(body)
@@ -1114,16 +1114,26 @@ function pushMessage(phone, msg) {
 const BASE_URL = "https://mpg-grade-corporations-distributors.trycloudflare.com";
 
 // 🔗 Convert URLs to clickable links
+// 🔗 Convert URLs to clickable links (fixed)
 function linkify(text) {
   if (!text) return "";
 
-  // Match only Google Maps URLs
-  const googleMapsRegex = /(https?:\/\/(www\.)?google\.com\/maps[^\s]*)/g;
+  // Match general URLs and Google Maps URLs
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
 
-  return text.replace(googleMapsRegex, url => {
-    return `<a href="${url}" target="_blank" class="text-blue-400 underline break-words">${url}</a>`;
+  // Replace with clickable <a> tags
+  return text.replace(urlRegex, (url) => {
+    let displayUrl = url;
+
+    // Optional: Shorten display for readability
+    if (displayUrl.length > 60) {
+      displayUrl = displayUrl.slice(0, 57) + "...";
+    }
+
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-blue-400 underline break-words hover:text-blue-500">${displayUrl}</a>`;
   });
 }
+
 
 // 🔗 Converts any file URL to a fully qualified URL
 function normalizeFileUrl(fileUrl) {
